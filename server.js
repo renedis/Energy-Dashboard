@@ -7,67 +7,59 @@ const si = require('systeminformation');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
 });
 
 app.use(express.static('public'));
 
-// PowerTOP endpoint
+// PowerTOP endpoint with C-State parsing
 app.get('/powertop', (req, res) => {
-    exec('powertop --csv --time=1', (error, stdout) => {
-        if (error) return res.status(500).send('PowerTOP error');
-        
-        // Parse C-State data
-        const cstates = [];
-        const lines = stdout.split('\n');
-        let inCstates = false;
-        
-        lines.forEach(line => {
-            if (line.startsWith('C-State Residency')) inCstates = true;
-            if (inCstates && line.startsWith('pkg(HW)')) {
-                const parts = line.split(';');
-                cstates.push({
-                    name: parts[0].trim(),
-                    residency: parts[3].trim(),
-                    duration: parts[4].trim()
-                });
-            }
-        });
+  exec('powertop --csv --time=1', (error, stdout) => {
+    if (error) return res.status(500).json({ error: 'PowerTOP failed' });
 
-        res.json({
-            raw: stdout,
-            cstates: cstates
-        });
-    });
-});
+    const cstates = [];
+    const lines = stdout.split('\n');
+    let inCstates = false;
 
-// WebSocket connection
-io.on('connection', (socket) => {
-    console.log('Client connected');
-    const interval = setInterval(async () => {
-        try {
-            const [cpu, mem] = await Promise.all([
-                si.currentLoad(),
-                si.mem()
-            ]);
-            socket.emit('stats', {
-                cpu: cpu.currentLoad.toFixed(1),
-                mem: ((mem.used / mem.total) * 100).toFixed(1)
-            });
-        } catch (error) {
-            console.error('Error fetching stats:', error);
+    lines.forEach(line => {
+      if (line.startsWith('C-State Residency')) inCstates = true;
+      if (inCstates && line.startsWith('pkg(HW)')) {
+        const parts = line.split(';');
+        if (parts.length > 4) {
+          cstates.push({
+            name: parts[0].trim(),
+            residency: parts[3].trim() + '%',
+            duration: parts[4].trim() + ' ms'
+          });
         }
-    }, 1000);
-
-    socket.on('disconnect', () => {
-        console.log('Client disconnected');
-        clearInterval(interval);
+      }
     });
+
+    res.json({ raw: stdout, cstates });
+  });
 });
 
-server.listen(88, () => {
-    console.log('Dark mode dashboard running on port 88');
+// WebSocket for real-time stats
+io.on('connection', (socket) => {
+  const interval = setInterval(async () => {
+    try {
+      const [cpu, mem] = await Promise.all([
+        si.currentLoad(),
+        si.mem()
+      ]);
+      socket.emit('stats', {
+        cpu: cpu.currentLoad.toFixed(1),
+        mem: ((mem.used / mem.total) * 100).toFixed(1)
+      });
+    } catch (error) {
+      console.error('Stats error:', error);
+    }
+  }, 1000);
+
+  socket.on('disconnect', () => clearInterval(interval));
 });
+
+server.listen(88, () => console.log('Server running on port 88'));
