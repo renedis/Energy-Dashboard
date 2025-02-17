@@ -15,25 +15,38 @@ const io = new Server(server, {
 
 app.use(express.static('public'));
 
-// PowerTOP endpoint with C-State parsing
 app.get('/powertop', (req, res) => {
   exec('powertop --csv --time=1', (error, stdout) => {
     if (error) return res.status(500).json({ error: 'PowerTOP failed' });
 
     const cstates = [];
     const lines = stdout.split('\n');
-    let inCstates = false;
+    let inPackageSection = false;
 
     lines.forEach(line => {
-      // Look for the correct section header
-      if (line.includes('Processor Idle State Report')) inCstates = true;
-      if (inCstates && line.startsWith('C')) {
-        const parts = line.split(';').map(p => p.trim());
-        if (parts.length >= 2 && parts[0].match(/^C\d+/)) {
-          cstates.push({
-            name: parts[0],
-            residency: parts[1]
-          });
+      // Start processing after Processor Idle State Report
+      if (line.includes('Processor Idle State Report')) {
+        inPackageSection = true;
+        return;
+      }
+
+      if (inPackageSection) {
+        // Stop processing at next major section
+        if (line.startsWith('____________________________________________________________________')) {
+          inPackageSection = false;
+          return;
+        }
+
+        // Capture package-level C-States
+        if (line.startsWith('C') && line.includes('(pc')) {
+          const parts = line.split(';').map(p => p.trim());
+          if (parts.length >= 2) {
+            const [name] = parts[0].split(' ');
+            cstates.push({
+              name: name,
+              residency: parts[1]
+            });
+          }
         }
       }
     });
