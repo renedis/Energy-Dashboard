@@ -1,25 +1,35 @@
-# Use Alpine base
 FROM alpine:latest
 
+# Install base packages
+RUN apk add --no-cache tzdata nodejs npm powertop procps busybox-extras
+
 # Set timezone
-RUN apk add --no-cache tzdata
-ENV TZ=Europe/Amsterdam
 RUN cp /usr/share/zoneinfo/Europe/Amsterdam /etc/localtime
+ENV TZ=Europe/Amsterdam
+
+# Create app structure
+WORKDIR /app
+
+# Debugging: Show directory structure before copy
+RUN echo "Pre-copy structure:" && ls -la
+
+# Copy package files
+COPY package*.json ./
+
+# Debugging: Verify files were copied
+RUN echo "Post-package copy contents:" && ls -la && cat package.json
 
 # Install dependencies
-RUN apk add --no-cache nodejs npm powertop procps busybox-extras
+RUN npm install --loglevel verbose
 
-# Create app directory and copy files
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
+# Copy remaining files
 COPY . .
 
-# Configure permissions for PowerTOP
+# Final directory check
+RUN echo "Final directory structure:" && ls -laR
+
+# Set PowerTOP permissions
 RUN chmod u+s /usr/sbin/powertop
 
-# Expose web port
 EXPOSE 88
-
-# Start script with auto-tune and web server
 CMD ["sh", "-c", "powertop --auto-tune & node server.js"]
