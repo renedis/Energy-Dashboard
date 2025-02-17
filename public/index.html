@@ -137,20 +137,19 @@
         });
 
         // PowerTOP data
-        function updatePowerTop() {
-            fetch('/powertop')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('powertop').textContent = data.raw;
-                    const cstatesDiv = document.getElementById('cstates');
-                    cstatesDiv.innerHTML = data.cstates?.map(cs => `
-                        <div class="cstate-item">
-                            ${cs.name}<br>
-                            🕒 ${cs.residency}<br>
-                            ⏱ ${cs.duration}
-                        </div>
-                    `).join('') || 'No C-State data available';
-                })
+function updatePowerTop() {
+    fetch('/powertop')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('powertop').textContent = data.raw;
+            const cstatesDiv = document.getElementById('cstates');
+            cstatesDiv.innerHTML = data.cstates?.map(cs => `
+                <div class="cstate-item">
+                    ${cs.name}<br>
+                    Residency: ${cs.residency}
+                </div>
+            `).join('') || 'No C-State data available';
+        })
                 .catch(() => {
                     document.getElementById('powertop').textContent = 'Failed to load PowerTOP data';
                     document.getElementById('cstates').innerHTML = 'C-State data unavailable';
