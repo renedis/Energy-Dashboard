@@ -10,27 +10,26 @@
         :root {
             --bg-color: #1c1c1e;
             --text-color: #ffffff;
-            --chart-size: 200px;
+            --chart-size: 160px;
         }
 
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
             min-height: 100vh;
+            padding: 20px;
         }
 
         .container {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 20px;
         }
 
         .chart-container {
             width: var(--chart-size);
             height: var(--chart-size);
-            margin: 10px;
-            float: right;
+            margin-bottom: 15px;
         }
 
         #powertop {
@@ -38,62 +37,98 @@
             color: #e5e5ea;
             padding: 15px;
             border-radius: 8px;
-            margin-top: 20px;
-            width: 100%;
             overflow-x: auto;
+        }
+
+        .cstate-card {
+            background: #2c2c2e;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .cstate-header {
+            color: #32d74b;
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+
+        .cstate-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .cstate-item {
+            background: #3a3a3c;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9em;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="row justify-content-end">
-            <div class="col-auto">
-                <div class="chart-container">
-                    <canvas id="cpuChart"></canvas>
-                </div>
-                <div class="chart-container">
-                    <canvas id="memChart"></canvas>
-                </div>
+        <div>
+            <div class="cstate-card">
+                <div class="cstate-header">C-States (pkg-HW)</div>
+                <div class="cstate-grid" id="cstates"></div>
+            </div>
+            <pre id="powertop"></pre>
+        </div>
+        
+        <div>
+            <div class="chart-container">
+                <canvas id="cpuChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="memChart"></canvas>
             </div>
         </div>
-        <pre id="powertop"></pre>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const darkTheme = {
-            backgroundColor: '#2c2c2e',
-            borderColor: '#48484a',
-            color: '#ffffff'
+        const theme = {
+            bg: '#2c2c2e',
+            text: '#ffffff',
+            accent: '#32d74b'
         };
 
+        // Initialize charts
         const createChart = (ctx, label) => new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: [label, 'Free'],
                 datasets: [{
                     data: [0, 100],
-                    backgroundColor: ['#32d74b', '#48484a'],
-                    borderColor: darkTheme.borderColor
+                    backgroundColor: [theme.accent, theme.bg],
+                    borderColor: '#48484a'
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        labels: { color: darkTheme.color }
-                    }
+                    legend: { labels: { color: theme.text } },
+                    tooltip: { bodyColor: theme.text }
                 }
             }
         });
 
-        const cpuCtx = document.getElementById('cpuChart').getContext('2d');
-        const memCtx = document.getElementById('memChart').getContext('2d');
-        const cpuChart = createChart(cpuCtx, 'CPU');
-        const memChart = createChart(memCtx, 'Memory');
+        const cpuChart = createChart(
+            document.getElementById('cpuChart').getContext('2d'), 
+            'CPU Usage'
+        );
+        
+        const memChart = createChart(
+            document.getElementById('memChart').getContext('2d'), 
+            'Memory Usage'
+        );
 
+        // Real-time updates
         socket.on('stats', stats => {
             cpuChart.data.datasets[0].data = [stats.cpu, 100 - stats.cpu];
             memChart.data.datasets[0].data = [stats.mem, 100 - stats.mem];
@@ -101,19 +136,26 @@
             memChart.update();
         });
 
-        // Fetch PowerTOP data every 5 seconds
+        // PowerTOP data
         function updatePowerTop() {
-    fetch('/powertop')
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.text();
-        })
-        .then(data => document.getElementById('powertop').textContent = data)
-        .catch(error => {
-            console.error('Failed to fetch PowerTOP data:', error);
-            document.getElementById('powertop').textContent = 'PowerTOP data unavailable';
-        });
-}
+            fetch('/powertop')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('powertop').textContent = data.raw;
+                    const cstatesDiv = document.getElementById('cstates');
+                    cstatesDiv.innerHTML = data.cstates?.map(cs => `
+                        <div class="cstate-item">
+                            ${cs.name}<br>
+                            🕒 ${cs.residency}<br>
+                            ⏱ ${cs.duration}
+                        </div>
+                    `).join('') || 'No C-State data available';
+                })
+                .catch(() => {
+                    document.getElementById('powertop').textContent = 'Failed to load PowerTOP data';
+                    document.getElementById('cstates').innerHTML = 'C-State data unavailable';
+                });
+        }
         setInterval(updatePowerTop, 5000);
         updatePowerTop();
     </script>
