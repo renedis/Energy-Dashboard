@@ -103,10 +103,17 @@
 
         // Fetch PowerTOP data every 5 seconds
         function updatePowerTop() {
-            fetch('/powertop')
-                .then(response => response.text())
-                .then(data => document.getElementById('powertop').textContent = data);
-        }
+    fetch('/powertop')
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.text();
+        })
+        .then(data => document.getElementById('powertop').textContent = data)
+        .catch(error => {
+            console.error('Failed to fetch PowerTOP data:', error);
+            document.getElementById('powertop').textContent = 'PowerTOP data unavailable';
+        });
+}
         setInterval(updatePowerTop, 5000);
         updatePowerTop();
     </script>
