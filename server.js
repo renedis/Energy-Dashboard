@@ -17,12 +17,30 @@ app.use(express.static('public'));
 
 // PowerTOP endpoint
 app.get('/powertop', (req, res) => {
-    exec('powertop --csv --time=1', (error, stdout, stderr) => {  // Changed command
-        if (error) {
-            console.error('PowerTOP error:', error);
-            return res.status(500).send('Error getting PowerTOP data');
-        }
-        res.send(stdout);
+    exec('powertop --csv --time=1', (error, stdout) => {
+        if (error) return res.status(500).send('PowerTOP error');
+        
+        // Parse C-State data
+        const cstates = [];
+        const lines = stdout.split('\n');
+        let inCstates = false;
+        
+        lines.forEach(line => {
+            if (line.startsWith('C-State Residency')) inCstates = true;
+            if (inCstates && line.startsWith('pkg(HW)')) {
+                const parts = line.split(';');
+                cstates.push({
+                    name: parts[0].trim(),
+                    residency: parts[3].trim(),
+                    duration: parts[4].trim()
+                });
+            }
+        });
+
+        res.json({
+            raw: stdout,
+            cstates: cstates
+        });
     });
 });
 
