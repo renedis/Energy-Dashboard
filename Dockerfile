@@ -1,32 +1,21 @@
 FROM alpine:latest
 
-# Install base packages
+# Install system packages
 RUN apk add --no-cache tzdata nodejs npm powertop procps busybox-extras
 
 # Set timezone
 RUN cp /usr/share/zoneinfo/Europe/Amsterdam /etc/localtime
 ENV TZ=Europe/Amsterdam
 
-# Create app structure
+# Create app directory structure
 WORKDIR /app
-
-# Debugging: Show directory structure before copy
-RUN echo "Pre-copy structure:" && ls -la
-
-# Copy package files
 COPY package*.json ./
 
-# Debugging: Verify files were copied
-RUN echo "Post-package copy contents:" && ls -la && cat package.json
+# Install Node.js dependencies
+RUN npm install
 
-# Install dependencies
-RUN npm install --loglevel verbose
-
-# Copy remaining files
+# Copy application files
 COPY . .
-
-# Final directory check
-RUN echo "Final directory structure:" && ls -laR
 
 # Set PowerTOP permissions
 RUN chmod u+s /usr/sbin/powertop
