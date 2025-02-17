@@ -25,14 +25,14 @@ app.get('/powertop', (req, res) => {
     let inCstates = false;
 
     lines.forEach(line => {
-      if (line.startsWith('C-State Residency')) inCstates = true;
-      if (inCstates && line.startsWith('pkg(HW)')) {
-        const parts = line.split(';');
-        if (parts.length > 4) {
+      // Look for the correct section header
+      if (line.includes('Processor Idle State Report')) inCstates = true;
+      if (inCstates && line.startsWith('C')) {
+        const parts = line.split(';').map(p => p.trim());
+        if (parts.length >= 2 && parts[0].match(/^C\d+/)) {
           cstates.push({
-            name: parts[0].trim(),
-            residency: parts[3].trim() + '%',
-            duration: parts[4].trim() + ' ms'
+            name: parts[0],
+            residency: parts[1]
           });
         }
       }
