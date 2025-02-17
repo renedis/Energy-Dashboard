@@ -1,35 +1,51 @@
 const express = require('express');
 const http = require('http');
 const { exec } = require('child_process');
-const SocketIO = require('socket.io');
+const { Server } = require('socket.io');
 const si = require('systeminformation');
 
 const app = express();
 const server = http.createServer(app);
-const io = SocketIO(server);
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
 
-// Serve static files
 app.use(express.static('public'));
 
-// PowerTOP data endpoint
+// PowerTOP endpoint
 app.get('/powertop', (req, res) => {
-    exec('powertop --csv', (error, stdout) => {
-        res.send(stdout);
+    exec('powertop --csv -n 1', (error, stdout, stderr) => {
+        res.send(stdout || stderr);
     });
 });
 
-// WebSocket for real-time updates
+// WebSocket connection
 io.on('connection', (socket) => {
-    setInterval(async () => {
-        const cpu = await si.currentLoad();
-        const mem = await si.mem();
-        socket.emit('stats', {
-            cpu: cpu.currentload.toFixed(1),
-            mem: ((mem.used / mem.total) * 100).toFixed(1)
-        });
+    console.log('Client connected');
+    const interval = setInterval(async () => {
+        try {
+            const [cpu, mem] = await Promise.all([
+                si.currentLoad(),
+                si.mem()
+            ]);
+            socket.emit('stats', {
+                cpu: cpu.currentLoad.toFixed(1),
+                mem: ((mem.used / mem.total) * 100).toFixed(1)
+            });
+        } catch (error) {
+            console.error('Error fetching stats:', error);
+        }
     }, 1000);
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected');
+        clearInterval(interval);
+    });
 });
 
 server.listen(88, () => {
-    console.log('Server running on port 88');
+    console.log('Dark mode dashboard running on port 88');
 });
