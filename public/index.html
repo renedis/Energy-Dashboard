@@ -145,12 +145,12 @@ function updatePowerTop() {
             const cstatesDiv = document.getElementById('cstates');
             cstatesDiv.innerHTML = data.cstates?.map(cs => `
                 <div class="cstate-item">
-                    ${cs.name}<br>
-                    Residency: ${cs.residency}
+                    <span class="cstate-name">${cs.name}</span>
+                    <span class="cstate-residency">${cs.residency}</span>
                 </div>
             `).join('') || 'No C-State data available';
         })
-                .catch(() => {
+        .catch(() => {
                     document.getElementById('powertop').textContent = 'Failed to load PowerTOP data';
                     document.getElementById('cstates').innerHTML = 'C-State data unavailable';
                 });
