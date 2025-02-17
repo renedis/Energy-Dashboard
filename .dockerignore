@@ -1,3 +1,5 @@
-*
-
-!container
+node_modules
+.git
+.gitignore
+Dockerfile
+*.md
