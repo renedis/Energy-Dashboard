@@ -17,8 +17,12 @@ app.use(express.static('public'));
 
 // PowerTOP endpoint
 app.get('/powertop', (req, res) => {
-    exec('powertop --csv -n 1', (error, stdout, stderr) => {
-        res.send(stdout || stderr);
+    exec('powertop --csv --time=1', (error, stdout, stderr) => {  // Changed command
+        if (error) {
+            console.error('PowerTOP error:', error);
+            return res.status(500).send('Error getting PowerTOP data');
+        }
+        res.send(stdout);
     });
 });
 
